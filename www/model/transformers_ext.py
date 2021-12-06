@@ -301,9 +301,10 @@ class TieredModelPipeline(nn.Module):
     loss_attributes = None
     if 'attributes' not in self.ablation:
       # 2a) Attribute classification
+      # batch_size * num_stories * num_entities * num_sentences, hidden
       out_a = self.attribute_classifier(out)
       out_a = torch.sigmoid(out_a)
-      out_a = out_a.view(batch_size * num_stories * num_entities, -1)
+      out_a = out_a.view(batch_size * num_stories * num_entities, num_sents, -1)
 
       for i in range(out_carry.shape[0]):
         for j in range(out_carry.shape[1]):
