@@ -177,6 +177,14 @@ class TieredModelPipeline(nn.Module):
     assert drop_out is not None, "Didn't set dropout!"
     self.dropout = nn.Dropout(drop_out)   
 
+    self.carry_over_classifier = nn.Sequential(
+        nn.Dropout(),
+        nn.Linear(embedding.config.hidden_size, embedding.config.hidden_size),
+        nn.ReLU(),
+        nn.Dropout(),
+        nn.Linear(embedding.config.hidden_size, 2)
+    )
+
     # State classifiers
     self.num_attributes = num_attributes
     self.labels_per_att = labels_per_att
@@ -281,6 +289,13 @@ class TieredModelPipeline(nn.Module):
 
 
     # 2) State classification
+
+    # 2a) carry over
+    # batch_size * num_stories * num_entities * num_sents, 2
+    out_carry = self.carry_over_classifier(out)
+    # batch_size * num_stories * num_entities, num_sentences
+    out_carry = out_carry.max(-1)[-1].view(batch_size * num_stories * num_entities, -1)
+
     return_dict = {}
 
     loss_attributes = None
@@ -297,6 +312,21 @@ class TieredModelPipeline(nn.Module):
 
     else:
       out_a = out
+
+    # loss_attributes = None
+    # if 'attributes' not in self.ablation:
+    #   # 2a) Attribute classification
+    #   out_a = self.attribute_classifier(out)
+    #   out_a = torch.sigmoid(out_a)
+    #   return_dict['out_attributes'] = out_a # Extract normalized logits (will turn to preds later)
+    #
+    #   if attributes is not None:
+    #     loss_fct = BCEWithLogitsLoss()
+    #     loss_attributes = loss_fct(out_a, attributes.view(batch_size * num_stories * num_entities * num_sents, -1).float())
+    #     return_dict['loss_attributes'] = loss_attributes
+    #
+    # else:
+    #   out_a = out
 
 
     # 2b) Precondition classification
