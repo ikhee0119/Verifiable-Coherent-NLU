@@ -303,6 +303,15 @@ class TieredModelPipeline(nn.Module):
       # 2a) Attribute classification
       out_a = self.attribute_classifier(out)
       out_a = torch.sigmoid(out_a)
+      out_a = out_a.view(batch_size * num_stories * num_entities, -1)
+
+      for i in range(out_carry.shape[0]):
+        for j in range(out_carry.shape[1]):
+            if j != 0 and out_carry[i][j] == 1:
+                out_a[i][j] = out_a[i][j-1]
+
+      out_a = out_a.view(batch_size * num_stories * num_entities * num_sents, -1)
+
       return_dict['out_attributes'] = out_a # Extract normalized logits (will turn to preds later)
 
       if attributes is not None:
