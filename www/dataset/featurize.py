@@ -71,6 +71,8 @@ def get_tensor_dataset_tiered(dataset, max_sentences, add_segment_ids=False):
         if j != 0 and all_attributes_flat[i][j][k] == all_attributes_flat[i][j-1][k]:
           all_carry[i][j][k] = 1
 
+  all_carry = all_carry.view(B, n_st * n_en * n_se, n_at)
+
   # print(all_input_ids.shape)
   # print(all_lengths.shape)
   # print(all_input_mask.shape)
