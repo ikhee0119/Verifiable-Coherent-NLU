@@ -182,7 +182,7 @@ class TieredModelPipeline(nn.Module):
         nn.Linear(embedding.config.hidden_size, embedding.config.hidden_size),
         nn.ReLU(),
         nn.Dropout(),
-        nn.Linear(embedding.config.hidden_size, 2)
+        nn.Linear(embedding.config.hidden_size, num_attributes * 2)
     )
 
     # State classifiers
@@ -251,7 +251,7 @@ class TieredModelPipeline(nn.Module):
     self.loss_weights = loss_weights
 
 
-  def forward(self, input_ids, input_lengths, input_entities, attention_mask=None, token_type_ids=None, attributes=None, preconditions=None, effects=None, conflicts=None, labels=None, training=False):
+  def forward(self, input_ids, input_lengths, input_entities, attention_mask=None, token_type_ids=None, attributes=None, preconditions=None, effects=None, conflicts=None, labels=None, carrys=None, training=False):
 
     batch_size, num_stories, num_entities, num_sents, seq_length = input_ids.shape
     assert num_stories == 2
@@ -291,53 +291,44 @@ class TieredModelPipeline(nn.Module):
     # 2) State classification
 
     # 2a) carry over
-    # batch_size * num_stories * num_entities * num_sents, 2
+    # batch_size * num_stories * num_entities * num_sentences, num_attributes * 2
     out_carry = self.carry_over_classifier(out)
-    # batch_size * num_stories * num_entities, num_sentences
-    out_carry = out_carry.max(-1)[-1].view(batch_size * num_stories * num_entities, -1)
+    # batch_size * num_stories * num_entities * num_sentences * num_attributes, 1
+    out_carry = out_carry.max(-1)[-1].view(batch_size * num_stories * num_entities * num_sents * self.num_attributes, -1)
+
+    out_carry = out_carry.view(batch_size * num_stories * num_entities, num_sents, self.num_attributes)
 
     return_dict = {}
 
     loss_attributes = None
     if 'attributes' not in self.ablation:
       # 2a) Attribute classification
-      # batch_size * num_stories * num_entities * num_sentences, hidden
+      # batch_size * num_stories * num_entities * num_sentences, num_attributes
       out_a = self.attribute_classifier(out)
       out_a = torch.sigmoid(out_a)
       out_a = out_a.view(batch_size * num_stories * num_entities, num_sents, -1)
 
       for i in range(out_carry.shape[0]):
         for j in range(out_carry.shape[1]):
-            if j != 0 and out_carry[i][j] == 1:
-                out_a[i][j] = out_a[i][j-1]
+            for k in range(out_carry.shape[2]):
+                if j != 0 and out_carry[i][j][k] == 1:
+                    out_a[i][j][k] = out_a[i][j-1][k]
 
       out_a = out_a.view(batch_size * num_stories * num_entities * num_sents, -1)
+      out_carry = out_carry.view(batch_size * num_stories * num_entities * num_sents, -1)
 
       return_dict['out_attributes'] = out_a # Extract normalized logits (will turn to preds later)
 
       if attributes is not None:
         loss_fct = BCEWithLogitsLoss()
         loss_attributes = loss_fct(out_a, attributes.view(batch_size * num_stories * num_entities * num_sents, -1).float())
+
+        loss_attributes += loss_fct(out_carry, carrys.view(batch_size * num_stories * num_entities * num_sents, -1).float())
+
         return_dict['loss_attributes'] = loss_attributes
 
     else:
       out_a = out
-
-    # loss_attributes = None
-    # if 'attributes' not in self.ablation:
-    #   # 2a) Attribute classification
-    #   out_a = self.attribute_classifier(out)
-    #   out_a = torch.sigmoid(out_a)
-    #   return_dict['out_attributes'] = out_a # Extract normalized logits (will turn to preds later)
-    #
-    #   if attributes is not None:
-    #     loss_fct = BCEWithLogitsLoss()
-    #     loss_attributes = loss_fct(out_a, attributes.view(batch_size * num_stories * num_entities * num_sents, -1).float())
-    #     return_dict['loss_attributes'] = loss_attributes
-    #
-    # else:
-    #   out_a = out
-
 
     # 2b) Precondition classification
     loss_preconditions = None

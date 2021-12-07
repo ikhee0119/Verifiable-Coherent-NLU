@@ -61,6 +61,16 @@ def get_tensor_dataset_tiered(dataset, max_sentences, add_segment_ids=False):
   all_spans = torch.tensor([[[story['entities'][e]['conflict_span_onehot'] if e < len(story['entities']) else np.zeros((max_sentences)) for e in range(max_entities)] for story in ex_2s['stories']] for ex_2s in dataset], dtype=torch.long)
   all_label_ids = torch.tensor([ex['label'] for ex in dataset], dtype=torch.long)
 
+  # carry
+  B, n_st, n_en, n_se, n_at = all_attributes.shape
+  all_carry = torch.zeros(B * n_st * n_en, n_se, n_at)
+  all_attributes_flat = all_attributes.view(B * n_st * n_en, n_se, n_at)
+  for i in range(all_carry.shape[0]):
+    for j in range(all_carry.shape[1]):
+      for k in range(all_carry.shape[2]):
+        if j != 0 and all_attributes_flat[i][j][k] == all_attributes_flat[i][j-1][k]:
+          all_carry[i][j][k] = 1
+
   # print(all_input_ids.shape)
   # print(all_lengths.shape)
   # print(all_input_mask.shape)
@@ -74,7 +84,7 @@ def get_tensor_dataset_tiered(dataset, max_sentences, add_segment_ids=False):
     all_input_ids = torch.tensor([[[[story['entities'][e]['segment_ids'][s] if e < len(story['entities']) else np.zeros((seq_length)) for s in range(max_sentences)] for e in range(max_entities)] for story in ex_2s['stories']] for ex_2s in dataset])
     tensor_dataset = TensorDataset(all_input_ids, all_lengths, num_entities, all_input_mask, all_attributes, all_preconditions, all_effects, all_spans, all_label_ids, all_segment_ids)
   else:
-    tensor_dataset = TensorDataset(all_input_ids, all_lengths, num_entities, all_input_mask, all_attributes, all_preconditions, all_effects, all_spans, all_label_ids)
+    tensor_dataset = TensorDataset(all_input_ids, all_lengths, num_entities, all_input_mask, all_attributes, all_preconditions, all_effects, all_spans, all_label_ids, all_carry)
   return tensor_dataset
 
 # Tokenize, numericalize, and pad an input dataset
