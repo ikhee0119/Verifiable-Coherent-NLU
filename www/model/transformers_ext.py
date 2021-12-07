@@ -293,10 +293,11 @@ class TieredModelPipeline(nn.Module):
     # 2a) carry over
     # batch_size * num_stories * num_entities * num_sentences, num_attributes * 2
     out_carry = self.carry_over_classifier(out)
-    # batch_size * num_stories * num_entities * num_sentences * num_attributes, 1
-    out_carry = out_carry.max(-1)[-1].view(batch_size * num_stories * num_entities * num_sents * self.num_attributes, -1)
 
-    out_carry = out_carry.view(batch_size * num_stories * num_entities, num_sents, self.num_attributes)
+    # batch_size * num_stories * num_entities * num_sentences * num_attributes, 2
+    out_carry = out_carry.view(batch_size * num_stories * num_entities * num_sents * self.num_attributes, 2)
+
+    out_carry = out_carry.max(-1)[-1].view(batch_size * num_stories * num_entities, num_sents, self.num_attributes)
 
     return_dict = {}
 
