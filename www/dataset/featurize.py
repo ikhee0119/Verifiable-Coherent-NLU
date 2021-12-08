@@ -63,15 +63,22 @@ def get_tensor_dataset_tiered(dataset, max_sentences, add_segment_ids=False):
 
   # carry
   B, n_st, n_en, n_se, n_at = all_attributes.shape
-  all_carry = torch.zeros(B * n_st * n_en, n_se, n_at)
+  all_carry = torch.zeros(B * n_st * n_en, n_se)
   all_attributes_flat = all_attributes.view(B * n_st * n_en, n_se, n_at)
   for i in range(all_carry.shape[0]):
     for j in range(all_carry.shape[1]):
-      for k in range(all_carry.shape[2]):
-        if j != 0 and all_attributes_flat[i][j][k] == all_attributes_flat[i][j-1][k]:
-          all_carry[i][j][k] = 1
+        if j != 0 and all_attributes_flat[i][j] == all_attributes_flat[i][j-1]:
+          all_carry[i][j] = 1
 
-  all_carry = all_carry.view(B, n_st * n_en * n_se, n_at)
+  # all_carry = torch.zeros(B * n_st * n_en, n_se, n_at)
+  # all_attributes_flat = all_attributes.view(B * n_st * n_en, n_se, n_at)
+  # for i in range(all_carry.shape[0]):
+  #   for j in range(all_carry.shape[1]):
+  #     for k in range(all_carry.shape[2]):
+  #       if j != 0 and all_attributes_flat[i][j][k] == all_attributes_flat[i][j-1][k]:
+  #         all_carry[i][j][k] = 1
+  #
+  # all_carry = all_carry.view(B, n_st * n_en * n_se, n_at)
 
   # print(all_input_ids.shape)
   # print(all_lengths.shape)

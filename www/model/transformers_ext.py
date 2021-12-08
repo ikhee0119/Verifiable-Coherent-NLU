@@ -182,7 +182,7 @@ class TieredModelPipeline(nn.Module):
         nn.Linear(embedding.config.hidden_size, embedding.config.hidden_size),
         nn.ReLU(),
         nn.Dropout(),
-        nn.Linear(embedding.config.hidden_size, num_attributes * 2)
+        nn.Linear(embedding.config.hidden_size, 2)
     )
 
     # State classifiers
@@ -291,13 +291,16 @@ class TieredModelPipeline(nn.Module):
     # 2) State classification
 
     # 2a) carry over
-    # batch_size * num_stories * num_entities * num_sentences, num_attributes * 2
+    # batch_size * num_stories * num_entities * num_sentences, 2
     out_carry = self.carry_over_classifier(out)
 
     # batch_size * num_stories * num_entities * num_sentences * num_attributes, 2
-    out_carry = out_carry.view(batch_size * num_stories * num_entities * num_sents * self.num_attributes, 2)
+    # out_carry = out_carry.view(batch_size * num_stories * num_entities * num_sents * self.num_attributes, 2)
+    # B * n_st * n_en, n_se
+    # out_carry = out_carry.max(-1)[-1].view(batch_size * num_stories * num_entities, num_sents, self.num_attributes)
 
-    out_carry = out_carry.max(-1)[-1].view(batch_size * num_stories * num_entities, num_sents, self.num_attributes)
+    # batch_size * num_stories * num_entities, num_sentences
+    out_carry = out_carry.max(-1)[-1].view(batch_size * num_stories * num_entities, num_sents)
 
     return_dict = {}
 
@@ -311,9 +314,14 @@ class TieredModelPipeline(nn.Module):
 
       for i in range(out_carry.shape[0]):
         for j in range(out_carry.shape[1]):
-            for k in range(out_carry.shape[2]):
-                if j != 0 and out_carry[i][j][k] == 1:
-                    out_a[i][j][k] = out_a[i][j-1][k]
+            if j != 0 and out_carry[i][j] == 1:
+                    out_a[i][j] = out_a[i][j-1]
+
+      # for i in range(out_carry.shape[0]):
+      #   for j in range(out_carry.shape[1]):
+      #       for k in range(out_carry.shape[2]):
+      #           if j != 0 and out_carry[i][j][k] == 1:
+      #               out_a[i][j][k] = out_a[i][j-1][k]
 
       out_a = out_a.view(batch_size * num_stories * num_entities * num_sents, -1)
       out_carry = out_carry.view(batch_size * num_stories * num_entities * num_sents, -1)
