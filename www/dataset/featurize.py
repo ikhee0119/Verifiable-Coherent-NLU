@@ -70,6 +70,8 @@ def get_tensor_dataset_tiered(dataset, max_sentences, add_segment_ids=False):
         if j != 0 and all_attributes_flat[i][j].equal(all_attributes_flat[i][j-1]):
           all_carry[i][j] = 1
 
+  all_carry = all_carry.view(B, n_st * n_en * n_se)
+
   # all_carry = torch.zeros(B * n_st * n_en, n_se, n_at)
   # all_attributes_flat = all_attributes.view(B * n_st * n_en, n_se, n_at)
   # for i in range(all_carry.shape[0]):
